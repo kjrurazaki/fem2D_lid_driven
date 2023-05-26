@@ -1,18 +1,20 @@
 import numpy as np
 from localBasis import localBasis
 
-class Element():
+
+class Element:
     """
     Builts element, returns mesh and basis functions for the mesh
     Element types:
         P1 (linear): Returns only P1 elements
         P1-Bubble: Returns mesh with center node
-        P1-iso-P2: Returns refined mesh (h) and original mesh (2h) 
+        P1-iso-P2: Returns refined mesh (h) and original mesh (2h)
     Returns:
         Mesh(es) coordinates, triangles, boundary nodes and conditions
-    
-    # TODO: Neumann boundary is not dealt when the mesh is refined 
+
+    # TODO: Neumann boundary is not dealt when the mesh is refined
     """
+
     def __init__(self, model, type):
         self.coord = model.coord
         self.triang = model.triang
@@ -24,20 +26,20 @@ class Element():
         self.only_dirichlet = model.only_dirichlet
 
         if self.only_dirichlet == True:
-            self.DirNod = np.concatenate([self.DirNod, self.NeuNod], axis = 0)
-            self.DirNod = np.sort(self.DirNod, axis = 0)
+            self.DirNod = np.concatenate([self.DirNod, self.NeuNod], axis=0)
+            self.DirNod = np.sort(self.DirNod, axis=0)
             self.NeuNod = np.array([])
             self.NDir = len(self.DirNod)
             self.NNeu = len(self.NeuNod)
             self.boundary_nodes = self.DirNod
         else:
-            self.boundary_nodes = np.concatenate([self.DirNod, self.NeuNod], axis = 0)
-        
+            self.boundary_nodes = np.concatenate([self.DirNod, self.NeuNod], axis=0)
+
         self.build_elements()
         self.delete_auxiliary()
 
     def build_elements(self):
-        if (self.element_type == 'linear') or (self.element_type == 'linear_gls'):
+        if (self.element_type == "linear") or (self.element_type == "linear_gls"):
             # Size identifiers
             self.Nodes = len(self.coord)
             self.NNeu = len(self.NeuNod)
@@ -55,7 +57,7 @@ class Element():
             self.triang_velocity = self.triang
             self.triang_pressure = self.triang
 
-        if self.element_type == 'bubble':
+        if self.element_type == "bubble":
             # Size identifiers
             self.Nodes = len(self.coord)
             self.NDir = len(self.DirNod)
@@ -72,13 +74,13 @@ class Element():
             # Add triangle centers (updates triangles and coordinates)
             self.add_triangle_centers()
             # nodes of velocity
-            self.lines_A = len(self.coord) 
+            self.lines_A = len(self.coord)
             self.triang_velocity = self.triang
             # nodes of pressure
             self.lines_B = self.Nodes
             self.triang_pressure = self.triang
 
-        if self.element_type == 'p1-iso-p2':
+        if self.element_type == "p1-iso-p2":
             # New boundary nodes are added in the check of "self.check_bn()"
             self.Nodes = len(self.coord)
             self.Nelem = len(self.triang)
@@ -104,25 +106,27 @@ class Element():
             self.NDir_velocity = len(self.DirNod_velocity)
             self.build_BC()
             # Basis functions
-            self.build_basis() # basis are built in the refined mesh
+            self.build_basis()  # basis are built in the refined mesh
 
     def delete_auxiliary(self):
         """
         Making sure some values are not used in the code after modification for element types
         """
-        self.DirNod = None # (changed Dirnod_pressure/velocity)
-        self.Nodes = None # (changed lines_A or lines_B)
-        self.DirVal = None # (changed for DirVal_pressure/velocity)
-        self.NDir = None # (changed for NDir_pressure/velocity)
-        self.boundary_nodes = None # (should not be used)
-        self.triang = None # (changed for triang_pressure/velocity)
+        self.DirNod = None  # (changed Dirnod_pressure/velocity)
+        self.Nodes = None  # (changed lines_A or lines_B)
+        self.DirVal = None  # (changed for DirVal_pressure/velocity)
+        self.NDir = None  # (changed for NDir_pressure/velocity)
+        self.boundary_nodes = None  # (should not be used)
+        self.triang = None  # (changed for triang_pressure/velocity)
 
     def build_basis(self):
         """
         Calculate element area and elemental coeffients of basis functions
         (b,c)
         """
-        self.Aloc, self.Bloc, self.Cloc, self.B_K_inv, self.Area, self.h = localBasis(self)
+        self.Aloc, self.Bloc, self.Cloc, self.B_K_inv, self.Area, self.h = localBasis(
+            self
+        )
 
     def build_BC(self):
         """
@@ -133,33 +137,41 @@ class Element():
         """
         # Dirichlet nodes for velocity
         self.DirVal_velocity = np.zeros((self.NDir_velocity, 2))
-        # Nodes in 
-        for nod in range(0, self.NDir_velocity):    
+        # Nodes in
+        for nod in range(0, self.NDir_velocity):
             global_node = self.DirNod_velocity[nod]
-            if self.coord[global_node - 1, 1] == np.max(self.coord[:, 1]): # Top side of square 
+            if self.coord[global_node - 1, 1] == np.max(
+                self.coord[:, 1]
+            ):  # Top side of square
                 self.DirVal_velocity[nod, 0] = 1
-        
+
     def check_bn(self):
         """
         Check if all the boundary nodes in the geometry are either defined as Neumann or Dirichlet
         Add all non defined boundaries as dirichlet
         """
+
         def find_boundary_nodes(self):
             boundary_nodes = []
             for i, coord in enumerate(self.coord):
                 x, y = coord
-                if (x == self.coord[:, 0].min() 
-                    or x == self.coord[:, 0].max() 
-                    or y == self.coord[:, 1].min() 
-                    or y == self.coord[:, 1].max()):
+                if (
+                    x == self.coord[:, 0].min()
+                    or x == self.coord[:, 0].max()
+                    or y == self.coord[:, 1].min()
+                    or y == self.coord[:, 1].max()
+                ):
                     boundary_nodes.append(i)
             return np.array(boundary_nodes)
+
         boundary_nodes = np.sort(find_boundary_nodes(self))
         defined_bn = np.sort((self.boundary_nodes - 1).flatten())
-        if self.only_dirichlet == True and not np.array_equal(boundary_nodes, defined_bn):
+        if self.only_dirichlet == True and not np.array_equal(
+            boundary_nodes, defined_bn
+        ):
             self.update_boundarynodes(boundary_nodes)
         defined_bn = np.sort((self.boundary_nodes - 1).flatten())
-        assert np.array_equal(boundary_nodes, defined_bn) 
+        assert np.array_equal(boundary_nodes, defined_bn)
 
     def update_boundarynodes(self, boundary_nodes):
         """
@@ -167,8 +179,12 @@ class Element():
         Need to update after mesh refinement (for velocity nodes)
         Adds all boundary nodes as Dirichlet boundaries for velocity
         """
-        self.DirNod = np.array(boundary_nodes + 1).reshape(-1, 1) # Nodes identification starts in 1
-        self.boundary_nodes = np.concatenate([self.DirNod, self.NeuNod.reshape(-1, 1)], axis = 0)
+        self.DirNod = np.array(boundary_nodes + 1).reshape(
+            -1, 1
+        )  # Nodes identification starts in 1
+        self.boundary_nodes = np.concatenate(
+            [self.DirNod, self.NeuNod.reshape(-1, 1)], axis=0
+        )
         self.NDir = len(self.DirNod)
 
     def add_triangle_centers(self):
@@ -241,8 +257,8 @@ class Element():
             # Update node_to_triangles dictionary
             triangles_relation[i].extend([i * 4, i * 4 + 1, i * 4 + 2])
 
-        self.triang = np.array(new_triang, dtype = int)
-        self.coord = np.array(new_coord, dtype = float)
+        self.triang = np.array(new_triang, dtype=int)
+        self.coord = np.array(new_coord, dtype=float)
         self.triangles_relation = triangles_relation
         self.viscosity = np.array(viscosity_new)
 
